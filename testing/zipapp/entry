@@ -11,6 +11,18 @@ from pre_commit.file_lock import lock
 CACHE_DIR = os.path.expanduser('~/.cache/pre-commit-zipapp')
 
 
+def _fixup_shebang(filename: str) -> None:
+    if sys.platform == 'win32':
+        python, _ = os.path.splitext(os.path.basename(sys.executable))
+
+        with open(filename, encoding='UTF-8', newline='') as f:
+            f.readline()  # discard the shebang line
+            contents = f.read()
+        with open(filename, 'w', encoding='UTF-8', newline='') as f:
+            f.write(f'#!/usr/bin/env {python}\n')
+            f.write(contents)
+
+
 def _make_executable(filename: str) -> None:
     os.chmod(filename, os.stat(filename).st_mode | stat.S_IXUSR)
 
@@ -32,8 +44,13 @@ def _ensure_cache(zipf: zipfile.ZipFile, cache_key: str) -> str:
         tmpdir = tempfile.mkdtemp(prefix=os.path.join(CACHE_DIR, ''))
         try:
             zipf.extractall(tmpdir)
+
+            shim = os.path.join(tmpdir, 'python')
+            # on windows we improve the shebang to be runnable by pre-commit
+            _fixup_shebang(shim)
             # zip doesn't maintain permissions
-            _make_executable(os.path.join(tmpdir, 'fakepython'))
+            _make_executable(shim)
+
             os.rename(tmpdir, cache_dest)
         except BaseException:
             shutil.rmtree(tmpdir)
@@ -49,8 +66,8 @@ def main() -> int:
 
         cache_dest = _ensure_cache(zipf, cache_key)
 
-    fakepython = os.path.join(cache_dest, 'fakepython')
-    cmd = (sys.executable, fakepython, '-mpre_commit', *sys.argv[1:])
+    shim = os.path.join(cache_dest, 'python')
+    cmd = (sys.executable, shim, '-mpre_commit', *sys.argv[1:])
     if sys.platform == 'win32':  # https://bugs.python.org/issue19124
         import subprocess
 

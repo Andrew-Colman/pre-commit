@@ -34,7 +34,7 @@ def _write_cache_key(version: str, wheeldir: str, dest: str) -> None:
     cache_hash = hashlib.sha256(f'{version}\n'.encode())
     for filename in sorted(os.listdir(wheeldir)):
         cache_hash.update(f'{filename}\n'.encode())
-    with open(os.path.join(HERE, 'fakepython'), 'rb') as f:
+    with open(os.path.join(HERE, 'python'), 'rb') as f:
         cache_hash.update(f.read())
     with open(os.path.join(dest, 'CACHE_KEY'), 'wb') as f:
         f.write(base64.urlsafe_b64encode(cache_hash.digest()).rstrip(b'='))
@@ -62,8 +62,8 @@ def main() -> int:
         _msg('validating wheels...')
         _check_no_shared_objects(wheeldir)
 
-        _msg('adding fakepython / __main__.py...')
-        shutil.copy(os.path.join(HERE, 'fakepython'), tmpdir)
+        _msg('adding shim / __main__.py...')
+        shutil.copy(os.path.join(HERE, 'python'), tmpdir)
         mainfile = os.path.join(tmpdir, '__main__.py')
         shutil.copy(os.path.join(HERE, 'entry'), mainfile)
 
